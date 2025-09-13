@@ -24,80 +24,55 @@ chrome.runtime.onMessage.addListener((msg, _sender, _sendResponse) => {
 
 // Global variable to track currently monitored element
 let currentlyMonitoredElement = null;
-let monitoringIndicator = null;
 
-// Function to create the monitoring indicator
-function createMonitoringIndicator() {
-  if (monitoringIndicator) {
-    return monitoringIndicator;
+// Function to add CSS styles for the monitoring indicator
+function addMonitoringStyles() {
+  if (document.getElementById("aiska-indicator-styles")) {
+    return; // Styles already added
   }
 
-  const indicator = document.createElement("div");
-  indicator.id = "aiska-monitoring-indicator";
-  indicator.innerHTML = "🔴"; // Red circle emoji, or you can use CSS for a custom circle
-  indicator.style.cssText = `
-    position: absolute;
-    width: 12px;
-    height: 12px;
-    background-color: #ff4444;
-    border-radius: 50%;
-    border: 2px solid white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    flex-shrink: 0;
-    display: none;
-    font-size: 8px;
-    line-height: 8px;
-    align-self: center;
-    `;
-
-  return indicator;
+  const style = document.createElement("style");
+  style.id = "aiska-indicator-styles";
+  style.textContent = `
+    .aiska-monitored::before {
+      content: "";
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      background-color: #ff4444;
+      border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      margin-right: 8px;
+      vertical-align: middle;
+      animation: aiska-pulse 1.5s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    
+    @keyframes aiska-pulse {
+      0% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.1); }
+      100% { opacity: 0.6; transform: scale(1); }
+    }
+  `;
+  document.head.appendChild(style);
 }
 
-// Function to show monitoring indicator next to an element
+// Function to show monitoring indicator using ::before pseudo-element
 function showMonitoringIndicator(element) {
   if (!element) return;
 
-  const indicator = createMonitoringIndicator();
+  // Add the monitoring class to trigger the ::before pseudo-element
+  element.classList.add("aiska-monitored");
 
-  // element.appendChild(indicator);
-  // wrapper.appendChild(element);
-  // wrapper.insertBefore(indicator, wrapper.firstChild);
-
-  // Position the indicator to the right of the element
-  // indicator.style.left = rect.right + scrollLeft + 5 + "px";
-  // indicator.style.top = rect.top + scrollTop + (rect.height - 12) / 2 + "px";
-  // indicator.style.display = "block";
-
-  // Add a subtle animation
-  // indicator.style.animation = "aiska-pulse 1.5s ease-in-out infinite";
-
-  // Add CSS animation if not already added
-  if (!document.getElementById("aiska-indicator-styles")) {
-    const style = document.createElement("style");
-    style.id = "aiska-indicator-styles";
-    style.textContent = `
-      @keyframes aiska-pulse {
-        0% { opacity: 0.6; transform: scale(1); }
-        50% { opacity: 1; transform: scale(1.1); }
-        100% { opacity: 0.6; transform: scale(1); }
-      }
-    `;
-    document.head.appendChild(style);
-  }
+  // Add CSS styles if not already added
+  addMonitoringStyles();
 }
 
 // Function to hide monitoring indicator
 function hideMonitoringIndicator() {
-  if (monitoringIndicator) {
-    monitoringIndicator.style.display = "none";
-    monitoringIndicator.style.animation = "none";
-  }
-}
-
-// Function to update indicator position (useful for scrolling or resizing)
-function updateIndicatorPosition() {
-  if (currentlyMonitoredElement && monitoringIndicator) {
-    showMonitoringIndicator(currentlyMonitoredElement);
+  if (currentlyMonitoredElement) {
+    currentlyMonitoredElement.classList.remove("aiska-monitored");
   }
 }
 
@@ -115,24 +90,15 @@ function startMonitoring(element) {
 
   // Add a data attribute to mark the element as monitored
   element.setAttribute("data-aiska-monitored", "true");
-
-  // Listen for scroll and resize events to update indicator position
-  window.addEventListener("scroll", updateIndicatorPosition);
-  window.addEventListener("resize", updateIndicatorPosition);
 }
 
 // Function to stop monitoring
 function stopMonitoring() {
   if (currentlyMonitoredElement) {
     currentlyMonitoredElement.removeAttribute("data-aiska-monitored");
+    currentlyMonitoredElement.classList.remove("aiska-monitored");
     currentlyMonitoredElement = null;
   }
-
-  hideMonitoringIndicator();
-
-  // Remove event listeners
-  window.removeEventListener("scroll", updateIndicatorPosition);
-  window.removeEventListener("resize", updateIndicatorPosition);
 
   console.log("[AIska] Stopped monitoring");
 }
@@ -282,21 +248,55 @@ document.addEventListener("click", (event) => {
   }
 });
 
-// Listen for blur events to stop monitoring when user leaves the field
+// Improved focusout handling - only stop monitoring if focus truly left the element
 document.addEventListener("focusout", (event) => {
-  // Small delay to check if focus moved to another editable element
-  setTimeout(() => {
-    const currentElement = getCurrentEditableElement();
-    if (!currentElement || currentElement !== currentlyMonitoredElement) {
-      stopMonitoring();
-    }
-  }, 100);
+  // Only stop monitoring if the focus is leaving the currently monitored element
+  if (currentlyMonitoredElement && event.target === currentlyMonitoredElement) {
+    // Longer delay to handle complex focus scenarios
+    setTimeout(() => {
+      const currentElement = getCurrentEditableElement();
+
+      // Only stop if:
+      // 1. No element is focused, OR
+      // 2. The focused element is different from what we're monitoring
+      if (!currentElement || currentElement !== currentlyMonitoredElement) {
+        console.log(
+          "[AIska] Focus truly left monitored element, stopping monitoring"
+        );
+        stopMonitoring();
+      } else {
+        console.log(
+          "[AIska] Focus still on monitored element, continuing monitoring"
+        );
+      }
+    }, 200); // Increased delay from 100ms to 200ms
+  }
+});
+
+// Additional event listener for when focus changes within the same element
+document.addEventListener("focus", (event) => {
+  // If focus is on a child of the monitored element, keep monitoring
+  if (
+    currentlyMonitoredElement &&
+    currentlyMonitoredElement.contains(event.target)
+  ) {
+    console.log(
+      "[AIska] Focus within monitored element, continuing monitoring"
+    );
+    return;
+  }
+
+  // If focus is on a different editable element, switch monitoring
+  const editableElement = getCurrentEditableElement();
+  if (editableElement && editableElement !== currentlyMonitoredElement) {
+    console.log(
+      "[AIska] Focus moved to different editable element, switching monitoring"
+    );
+    startMonitoring(editableElement);
+  }
 });
 
 // Clean up when page unloads
 window.addEventListener("beforeunload", () => {
   stopMonitoring();
-  if (monitoringIndicator && monitoringIndicator.parentNode) {
-    monitoringIndicator.parentNode.removeChild(monitoringIndicator);
-  }
 });
