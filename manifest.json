@@ -9,21 +9,14 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "https://httpbin.org/*",
-        "https://example.com/*",
-        "https://chat.openai.com/*"
-      ],
-      "js": ["utils/luhn.js", "content.js"],
-      "css": ["banner.css"],
-      "run_at": "document_end"
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
     }
   ],
-  "permissions": ["scripting", "storage"],
+  "permissions": ["scripting", "activeTab"],
   "background": { "service_worker": "sw.js" },
-  "host_permissions": [
-    "https://httpbin.org/*",
-    "https://example.com/*",
-    "https://chat.openai.com/*"
-  ]
+  "action": {
+    "default_title": "Log first <textarea>"
+  }
 }
