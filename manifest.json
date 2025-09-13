@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Sensitive Data Guard",
+  "description": "Warns before sensitive data (emails, credit cards, etc.) are submitted in forms or chats.",
+  "version": "0.1",
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://httpbin.org/*",
+        "https://example.com/*",
+        "https://chat.openai.com/*"
+      ],
+      "js": ["utils/luhn.js", "content.js"],
+      "css": ["banner.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://httpbin.org/*",
+    "https://example.com/*",
+    "https://chat.openai.com/*"
+  ],
+  "options_page": "options.html"
+}
