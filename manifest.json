@@ -19,7 +19,7 @@
       "run_at": "document_end"
     }
   ],
-  "permissions": ["storage"],
+  "permissions": ["scripting", "storage"],
   "host_permissions": [
     "https://httpbin.org/*",
     "https://example.com/*",
