@@ -20,6 +20,7 @@
     }
   ],
   "permissions": ["scripting", "storage"],
+  "background": { "service_worker": "sw.js" },
   "host_permissions": [
     "https://httpbin.org/*",
     "https://example.com/*",

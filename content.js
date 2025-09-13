@@ -38,16 +38,24 @@ document.addEventListener(
       );
 
       showWarningBanner(findings, () => {
-        console.warn("SensitiveDataGuard: user chose to override and send.");
-        // Allow exactly one subsequent submit to proceed.
-        sdgAllowOnce.add(form);
+        if (
+          confirm(
+            `SensitiveDataGuard found possible sensitive data ("${findings.join(
+              ", "
+            )}"). Send anyway?`
+          )
+        ) {
+          console.warn("SensitiveDataGuard: user chose to override and send.");
+          // Allow exactly one subsequent submit to proceed.
+          sdgAllowOnce.add(form);
 
-        // Prefer requestSubmit (validates + fires submit like a real click).
-        if (typeof form.requestSubmit === "function") {
-          form.requestSubmit();
-        } else {
-          // Fallback: programmatic submit (note: doesn't validate or fire submit by spec).
-          form.submit();
+          // Prefer requestSubmit (validates + fires submit like a real click).
+          if (typeof form.requestSubmit === "function") {
+            form.requestSubmit();
+          } else {
+            // Fallback: programmatic submit (note: doesn't validate or fire submit by spec).
+            form.submit();
+          }
         }
       });
     }
@@ -140,4 +148,57 @@ function isValidIBAN(str) {
     remainder = (remainder * 10 + parseInt(digit, 10)) % 97;
   }
   return remainder === 1;
+}
+
+if (location.hostname === "chat.openai.com") {
+  setupChatboxGuard();
+}
+
+function setupChatboxGuard() {
+  const attached = new WeakSet();
+
+  const attachIfReady = () => {
+    const box = document.querySelector("textarea");
+    if (!box || attached.has(box)) return;
+    attached.add(box);
+
+    box.addEventListener(
+      "keydown",
+      function onKeyDown(event) {
+        if (event.key !== "Enter" || event.shiftKey || event.altKey) return;
+
+        const pendingText = box.value;
+        const findings = detectSensitiveData(pendingText);
+        if (findings.length === 0) return;
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        console.warn(
+          "SensitiveDataGuard: blocked chat submission with findings:",
+          findings
+        );
+
+        const form = box.form;
+        showWarningBanner(findings, () => {
+          console.warn(
+            "SensitiveDataGuard: user chose to override and send via chat."
+          );
+          if (form) {
+            sdgAllowOnce.add(form);
+            if (typeof form.requestSubmit === "function") {
+              form.requestSubmit();
+            } else {
+              form.submit();
+            }
+          }
+        });
+      },
+      true
+    );
+  };
+
+  attachIfReady();
+  const mo = new MutationObserver(attachIfReady);
+  mo.observe(document.documentElement, { childList: true, subtree: true });
 }
